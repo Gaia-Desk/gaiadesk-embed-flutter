@@ -1,0 +1,7 @@
+<!--
+  Nothing here: net.gaiadesk:embed-android declares INTERNET and the
+  screen-capture activity and service it needs. An app that opts into sharing
+  the whole screen (EmbedCapture.screen) adds FOREGROUND_SERVICE and
+  FOREGROUND_SERVICE_MEDIA_PROJECTION itself (README).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

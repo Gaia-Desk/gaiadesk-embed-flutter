@@ -1,0 +1,37 @@
+# gaiadesk_embed: the Dart sources, the iOS and Android plugin code and the
+# example are MIT (LICENSE). The native GaiaDesk embed library the platform
+# SDKs bundle (GaiaDeskEmbed pod, net.gaiadesk:embed-android) is under the
+# GaiaDesk Native Binary Licence (LICENSE-BINARY). Dependencies: the Flutter
+# SDK only (BSD-3-Clause).
+name: gaiadesk_embed
+description: "A \"Get help\" button for Flutter apps: share your app's own screen with your support team, consent first, masked regions painted out, view-only by default."
+version: 0.1.0
+homepage: https://gaiadesk.net
+repository: https://github.com/Gaia-Desk/gaiadesk-embed-flutter
+issue_tracker: https://github.com/Gaia-Desk/gaiadesk-embed-flutter/issues
+topics:
+  - support
+  - screen-sharing
+  - cobrowsing
+
+environment:
+  sdk: ^3.5.0
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: net.gaiadesk.embed.flutter
+        pluginClass: GaiaDeskEmbedPlugin
+      ios:
+        pluginClass: GaiaDeskEmbedPlugin
