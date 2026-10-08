@@ -7,7 +7,9 @@ plugins {
 android {
     namespace = "net.gaiadesk.gaiadesk_embed_example"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // The plugin and the app have no C/C++ of their own: any installed NDK serves; r27 is the
+    // one GaiaDesk builds libgaiadesk_embed with (Flutter would otherwise download its own).
+    ndkVersion = "27.2.12479018"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
