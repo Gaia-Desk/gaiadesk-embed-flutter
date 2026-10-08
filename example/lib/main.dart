@@ -23,7 +23,11 @@ final _autostart = const bool.fromEnvironment('GAIADESK_DEMO_AUTOSTART') ||
     demoFlag('GAIADESK_DEMO_AUTOSTART');
 const _company = 'Acme Bank';
 
-void main() => runApp(const AcmeBankApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await loadDemoEnv();
+  runApp(const AcmeBankApp());
+}
 
 class AcmeBankApp extends StatelessWidget {
   const AcmeBankApp({super.key});

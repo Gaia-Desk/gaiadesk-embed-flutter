@@ -1,6 +1,6 @@
 // Test hooks for the example, read from the process environment (on the iOS
 // Simulator: `SIMCTL_CHILD_<name>` in `xcrun simctl launch`'s environment), so
-// one build serves every run. The same names as the native iOS examples:
+// one build serves every run; `loadDemoEnv` runs before `runApp`. The same names as the native iOS examples:
 //
 //   GAIADESK_EMBED_TOKEN / GAIADESK_SERVER  as the --dart-define's (these win)
 //   GAIADESK_DEMO_AUTOSTART=1               press Get help at launch
@@ -10,22 +10,40 @@
 //   GAIADESK_DEMO_CMD=1                     run stop|pause|resume written to <app tmp>/gaiadesk-demo-cmd
 //
 // With any GAIADESK_DEMO_* set, the app prints one JSON object per line
-// (`gaiadesk_demo {...}`): `{"type":"demo", "frame", "card", "blue", "buy"}`
+// (`gaiadesk_demo {...}`, through `print`: the device log, `flutter logs`),
+// and appends it to `<app tmp>/gaiadesk-demo-events.jsonl` (the Simulator's
+// unified log can drop lines; tests read the file): `{"type":"demo", "frame", "card", "blue", "buy"}`
 // (rects as [x, y, w, h] in logical pixels), every embed event as the
 // library's JSON, `{"bought": n}`, `{"start_error": code}`.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:gaiadesk_embed/gaiadesk_embed.dart';
 
-Map<String, String> get _env {
+Map<String, String> _env = const {};
+
+/// Read the process environment, before `runApp`. Dart's
+/// `Platform.environment` is empty on iOS, so the example's AppDelegate
+/// answers `environment` on the `gaiadesk_embed_example/env` channel with the
+/// GAIADESK_* variables; elsewhere `Platform.environment` is used.
+Future<void> loadDemoEnv() async {
   try {
-    return Platform.environment;
-  } catch (_) {
-    return const {};
+    final m = await const MethodChannel('gaiadesk_embed_example/env').invokeMapMethod<String, String>('environment');
+    if (m != null) {
+      _env = m;
+      return;
+    }
+  } on MissingPluginException {
+    // not the iOS example
+  } on PlatformException {
+    // same
   }
+  try {
+    _env = Platform.environment;
+  } catch (_) {}
 }
 
 String? demoEnv(String name) {
@@ -36,10 +54,24 @@ String? demoEnv(String name) {
 bool demoFlag(String name) => demoEnv(name) == '1';
 
 /// Whether the test hooks are on (any GAIADESK_DEMO_* in the environment).
-final bool demoTesting = _env.keys.any((k) => k.startsWith('GAIADESK_DEMO_'));
+bool get demoTesting => _env.keys.any((k) => k.startsWith('GAIADESK_DEMO_'));
+
+final File _eventsFile = () {
+  final f = File('${Directory.systemTemp.path}/gaiadesk-demo-events.jsonl');
+  try {
+    if (demoTesting) f.writeAsStringSync('');
+  } catch (_) {}
+  return f;
+}();
 
 void demoEmit(Map<String, Object?> o) {
-  if (demoTesting) stdout.writeln('gaiadesk_demo ${jsonEncode(o)}');
+    if (!demoTesting) return;
+  final line = jsonEncode(o);
+  // ignore: avoid_print
+  print('gaiadesk_demo $line');
+  try {
+    _eventsFile.writeAsStringSync('$line\n', mode: FileMode.append, flush: true);
+  } catch (_) {}
 }
 
 /// An embed event as the library's JSON shape.
