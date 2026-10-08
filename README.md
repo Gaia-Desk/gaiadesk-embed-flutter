@@ -128,10 +128,11 @@ placed at a guess.
 `TextFormField`, any `EditableText` with `obscureText`) is found in the render tree after each frame
 and masked, without a `GaiaDeskMasked` around it: Flutter draws them itself, so the native SDKs
 cannot see them as password fields. While an obscured field has focus it stays masked even when it
-scrolls out of view (a mask clamped to the view's edge), and guided typing is refused (`masked`):
-the native SDKs refuse typing into a focused view that a mask covers (on Android the focused view is
-the whole Flutter view), and on iOS Flutter's text input view for an obscured field is a secure text
-entry, which the SDK refuses too. Mask other secrets (card numbers, balances) yourself.
+scrolls out of view (a mask clamped to the view's edge), and guided typing and keys are refused
+(`masked`): the plugin tells the native SDK when focus enters or leaves an obscured field
+(`setSecretFocus`), since the SDK cannot see inside the Flutter view. On Android this also replaces
+the SDK's "focused view under a mask" rule, which treated the whole Flutter view as one field.
+Mask other secrets (card numbers, balances) yourself.
 
 Regions you know yourself go in `EmbedOptions.masks` at start and `session.setMaskedRects(rects)`
 afterwards (`Rect`s in logical pixels, e.g. from `RenderBox.localToGlobal`); these replace each
@@ -253,7 +254,7 @@ flutter analyze
 
 The channel contract: method channel `gaiadesk_embed` (`requestConsent` / `recordConsent` → a
 plugin consent handle or null, `start` (with `consent`: that handle) → a plugin session id,
-`stop`, `setMaskedRects`, `setPaused`, `buildInfo`) and event channel
+`stop`, `setMaskedRects`, `setPaused`, `setSecretFocus` (focus in an obscured field), `buildInfo`) and event channel
 `gaiadesk_embed/events` (`{session, event}`, `event` being the library's event JSON, as a map or a
 string).
 

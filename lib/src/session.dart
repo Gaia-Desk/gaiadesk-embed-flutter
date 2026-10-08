@@ -86,6 +86,12 @@ class EmbedSession {
   }
 
   /// A [GaiaDeskMasked] widget moved, appeared or went away.
+  /// Keyboard focus entered (true) or left (false) an obscured field.
+  void secretFocusChanged(bool secret) {
+    if (isEnded) return;
+    _channel.invokeMethod<void>('setSecretFocus', {'session': id, 'secret': secret}).catchError((Object _) {});
+  }
+
   void masksChanged() {
     _sendMasks().catchError((Object _) {});
   }

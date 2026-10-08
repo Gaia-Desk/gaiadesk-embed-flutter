@@ -122,6 +122,10 @@ abstract final class GaiaDeskEmbed {
     final session = EmbedSession.internal(id, _methods, appMasks: options.masks, onEnded: _ended);
     _sessions[id] = session;
     _current = session;
+    // Always said once: it also tells the native SDKs that this app reports
+    // secret focus itself (on Android it replaces the "focused view under a
+    // mask" rule, which sees the whole Flutter view as one field).
+    session.secretFocusChanged(MaskRegistry.instance.secretFocusNow());
     for (final e in _early.remove(id) ?? const <EmbedEvent>[]) {
       session.deliver(e);
     }

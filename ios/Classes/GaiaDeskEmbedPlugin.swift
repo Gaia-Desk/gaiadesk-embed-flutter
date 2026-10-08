@@ -71,6 +71,9 @@ public final class GaiaDeskEmbedPlugin: NSObject, FlutterPlugin, FlutterStreamHa
             case "setMaskedRects":
                 if let session { try sessions[session]?.setMaskedRects(Self.rects(args["masks"])) }
                 result(nil)
+            case "setSecretFocus":
+                if let session { sessions[session]?.setSecretFocus(args["secret"] as? Bool ?? false) }
+                result(nil)
             case "setPaused":
                 if let session { sessions[session]?.setPaused(args["paused"] as? Bool ?? false) }
                 result(nil)

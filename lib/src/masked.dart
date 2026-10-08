@@ -61,7 +61,9 @@ class RenderGaiaDeskMasked extends RenderProxyBox {
 /// rect is always reported, clamped into the view (at least 1×1) even when it
 /// has scrolled away: the native SDKs refuse guided typing into a focused
 /// view that a mask covers (`masked`), and on Android the focused view is the
-/// whole Flutter view.
+/// whole Flutter view. Focus entering or leaving an obscured field is also
+/// told to the session (`setSecretFocus`), which makes the native SDKs refuse
+/// guided typing outright, wherever the field is.
 class MaskRegistry {
   MaskRegistry._();
 
@@ -109,7 +111,26 @@ class MaskRegistry {
     SchedulerBinding.instance.addPersistentFrameCallback((_) => _afterFrame());
     // Focus moving into or out of an obscured field changes the masks even
     // when nothing repaints.
-    FocusManager.instance.addListener(SchedulerBinding.instance.scheduleFrame);
+    FocusManager.instance.addListener(() {
+      SchedulerBinding.instance.scheduleFrame();
+      _checkSecretFocus();
+    });
+  }
+
+  bool _secretFocus = false;
+
+  /// Whether keyboard focus is in an obscured field right now (what `start`
+  /// tells the native side first).
+  bool secretFocusNow() => _secretFocus = focusedObscuredRect() != null;
+
+  /// Tell the running session when focus enters or leaves an obscured field:
+  /// the native SDKs then refuse guided typing and keys (`masked`). They
+  /// cannot see inside the Flutter view to know it themselves.
+  void _checkSecretFocus() {
+    final now = focusedObscuredRect() != null;
+    if (now == _secretFocus) return;
+    _secretFocus = now;
+    GaiaDeskEmbed.current?.secretFocusChanged(now);
   }
 
   Map<Object, Rect> _exact() {
@@ -170,6 +191,7 @@ class MaskRegistry {
   }
 
   void _afterFrame() {
+    _checkSecretFocus();
     final exact = _exact();
     var moving = false;
     final now = <Rect>[];

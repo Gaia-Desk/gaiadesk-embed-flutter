@@ -105,4 +105,43 @@ void main() {
     expect(MaskRegistry.clampInto(const Rect.fromLTWH(10, 2000, 100, 40), size), const Rect.fromLTRB(10, 799, 110, 800));
     expect(MaskRegistry.clampInto(const Rect.fromLTWH(-500, -500, 10, 10), size), const Rect.fromLTRB(0, 0, 1, 1));
   });
+
+  testWidgets('focus entering or leaving an obscured field is told to the session (setSecretFocus)', (tester) async {
+    final pw = FocusNode();
+    addTearDown(pw.dispose);
+    await tester.pumpWidget(_form(obscure: true, focus: pw));
+    final s = (await tester.runAsync(() => startWithConsent(options)))!;
+    List<Object?> told() => [for (final c in native.named('setSecretFocus')) (c.arguments as Map)['secret']];
+    // Said once at start, so the native side knows this app reports it.
+    expect(told(), [false]);
+    expect((native.named('setSecretFocus').single.arguments as Map)['session'], s.id);
+
+    pw.requestFocus();
+    await tester.pump();
+    await tester.runAsync(() => pumpEventQueue());
+    expect(told(), [false, true]);
+
+    // A plain field: not secret.
+    await tester.tap(find.byKey(const Key('user')));
+    await tester.pump();
+    await tester.runAsync(() => pumpEventQueue());
+    expect(told(), [false, true, false]);
+
+    // Nothing changes: nothing more is said.
+    await tester.pump();
+    await tester.runAsync(() => pumpEventQueue());
+    expect(told(), [false, true, false]);
+    await tester.runAsync(() => s.stop());
+  });
+
+  testWidgets('a session started with focus already in an obscured field says so at once', (tester) async {
+    final pw = FocusNode();
+    addTearDown(pw.dispose);
+    await tester.pumpWidget(_form(obscure: true, focus: pw));
+    pw.requestFocus();
+    await tester.pump();
+    final s = (await tester.runAsync(() => startWithConsent(options)))!;
+    expect([for (final c in native.named('setSecretFocus')) (c.arguments as Map)['secret']], [true]);
+    await tester.runAsync(() => s.stop());
+  });
 }

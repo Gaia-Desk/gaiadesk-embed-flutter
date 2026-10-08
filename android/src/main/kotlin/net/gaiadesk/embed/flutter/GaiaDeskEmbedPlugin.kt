@@ -100,6 +100,10 @@ class GaiaDeskEmbedPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
                     s?.setMaskedRects(rects(call.argument<List<Map<String, Number>>>("masks")))
                     result.success(null)
                 }
+                "setSecretFocus" -> {
+                    sessions[call.argument<Int>("session")]?.setSecretFocus(call.argument<Boolean>("secret") == true)
+                    result.success(null)
+                }
                 "setPaused" -> {
                     sessions[call.argument<Int>("session")]?.setPaused(call.argument<Boolean>("paused") == true)
                     result.success(null)
