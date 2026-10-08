@@ -35,3 +35,6 @@ migrate_working_dir/
 # Local build output
 /example/build/
 .flutter-plugins
+
+# The example pods resolve GaiaDeskEmbed from a local path (GAIADESK_EMBED_IOS_PATH).
+example/ios/Podfile.lock
