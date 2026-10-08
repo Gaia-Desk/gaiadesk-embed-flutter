@@ -124,6 +124,15 @@ safe, too little is not. On Android, masks need the foreground activity's Flutte
 without one, `setMaskedRects` and `start` with masks are refused (`no_activity`) rather than
 placed at a guess.
 
+**Password fields are masked for you.** Every obscured text field (`TextField(obscureText: true)`,
+`TextFormField`, any `EditableText` with `obscureText`) is found in the render tree after each frame
+and masked, without a `GaiaDeskMasked` around it: Flutter draws them itself, so the native SDKs
+cannot see them as password fields. While an obscured field has focus it stays masked even when it
+scrolls out of view (a mask clamped to the view's edge), and guided typing is refused (`masked`):
+the native SDKs refuse typing into a focused view that a mask covers (on Android the focused view is
+the whole Flutter view), and on iOS Flutter's text input view for an obscured field is a secure text
+entry, which the SDK refuses too. Mask other secrets (card numbers, balances) yourself.
+
 Regions you know yourself go in `EmbedOptions.masks` at start and `session.setMaskedRects(rects)`
 afterwards (`Rect`s in logical pixels, e.g. from `RenderBox.localToGlobal`); these replace each
 other, and the `GaiaDeskMasked` widgets are always added. The native side converts: on iOS

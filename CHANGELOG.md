@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Obscured text fields (`obscureText: true`) are masked automatically, found in the render tree
+  each frame; a focused obscured field stays masked (clamped into the view) even when scrolled
+  away, so guided typing into it is refused (`masked`).
 - **Breaking:** consent is an `EmbedConsent` recorded by the native library, not a bool.
   `requestConsent` returns `EmbedConsent?`; `recordConsent` records the YES of your own dialog;
   `start(options, consent:)` takes it once, and refuses one for another company, capture, or a
