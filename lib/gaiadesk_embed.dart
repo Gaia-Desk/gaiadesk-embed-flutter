@@ -8,7 +8,7 @@
 /// gate: it refuses to start without consent and owns the indicator.
 library;
 
-export 'src/embed.dart' show GaiaDeskEmbed, EmbedBuildInfo;
+export 'src/embed.dart' show GaiaDeskEmbed, EmbedBuildInfo, EmbedConsent;
 export 'src/events.dart';
 export 'src/exception.dart';
 export 'src/masked.dart' show GaiaDeskMasked;

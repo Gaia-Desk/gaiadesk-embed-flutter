@@ -7,6 +7,7 @@ class FakeNative {
   final List<MethodCall> calls = [];
   MockStreamHandlerEventSink? _sink;
   int _nextId = 1;
+  int _nextConsent = 1;
 
   /// Make the next `start` (or any method named here) fail like the SDK does.
   final Map<String, PlatformException> failures = {};
@@ -25,7 +26,9 @@ class FakeNative {
         case 'start':
           return _nextId++;
         case 'requestConsent':
-          return consentAnswer;
+          return consentAnswer ? 'c${_nextConsent++}' : null;
+        case 'recordConsent':
+          return 'c${_nextConsent++}';
         case 'buildInfo':
           return buildInfo;
         default:
@@ -58,3 +61,10 @@ class FakeNative {
 }
 
 const options = EmbedOptions(embedToken: 'gdemb_test', company: 'Acme');
+
+/// A recorded consent matching [o] (as the app's own dialog would give).
+Future<EmbedConsent> consentFor(EmbedOptions o) =>
+    GaiaDeskEmbed.recordConsent(o.company, guided: o.guided, capture: o.capture);
+
+/// Start [o] with a fresh matching consent.
+Future<EmbedSession> startWithConsent(EmbedOptions o) async => GaiaDeskEmbed.start(o, consent: await consentFor(o));

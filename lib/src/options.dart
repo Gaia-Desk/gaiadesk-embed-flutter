@@ -68,7 +68,7 @@ class EmbedOptions {
   /// library would make anyway (so a mistake fails the same way everywhere).
   /// [extraMasks] are the [GaiaDeskMasked] widgets' rects.
   Map<String, Object?> toChannelArguments({
-    required bool consentGranted,
+    required String consent,
     required TargetPlatform platform,
     List<Rect> extraMasks = const [],
   }) {
@@ -100,7 +100,7 @@ class EmbedOptions {
       'masks': rectsToChannel([...masks, ...extraMasks]),
       'capture': capture.name,
       'captureMethod': captureMethod.name,
-      'consentGranted': consentGranted,
+      'consent': consent,
     };
   }
 }

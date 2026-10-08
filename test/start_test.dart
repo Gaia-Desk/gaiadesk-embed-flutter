@@ -20,31 +20,69 @@ void main() {
   Matcher refusal(String code) => isA<EmbedException>().having((e) => e.code, 'code', code);
 
   group('consent', () {
-    test('start refuses without consent and never reaches native', () async {
-      await expectLater(GaiaDeskEmbed.start(options, consentGranted: false), throwsA(refusal('consent_required')));
-      expect(native.calls, isEmpty);
-    });
-
-    test('a non-bool consent through a dynamic call is refused too', () async {
-      final Function start = GaiaDeskEmbed.start;
-      Future<void> call(Object? v) async => await Function.apply(start, [options], {#consentGranted: v});
-      await expectLater(call('yes'), throwsA(isA<TypeError>()));
-      expect(native.calls, isEmpty);
-    });
-
-    test('requestConsent passes company, guided and capture; returns the answer', () async {
+    test('requestConsent passes company, guided and capture; null when declined', () async {
       native.consentAnswer = false;
-      expect(await GaiaDeskEmbed.requestConsent('Acme', guided: true, capture: EmbedCapture.screen), isFalse);
+      expect(await GaiaDeskEmbed.requestConsent('Acme', guided: true, capture: EmbedCapture.screen), isNull);
       expect(native.named('requestConsent').single.arguments, {'company': 'Acme', 'guided': true, 'capture': 'screen'});
       native.consentAnswer = true;
-      expect(await GaiaDeskEmbed.requestConsent('Acme'), isTrue);
+      final c = await GaiaDeskEmbed.requestConsent('Acme');
+      expect(c, isNotNull);
+      expect((c!.company, c.guided, c.capture), ('Acme', false, EmbedCapture.app));
       expect(native.named('requestConsent').last.arguments, {'company': 'Acme', 'guided': false, 'capture': 'app'});
+    });
+
+    test('recordConsent records with the native library; start passes its handle', () async {
+      final c = await GaiaDeskEmbed.recordConsent('Acme', guided: true);
+      expect(native.named('recordConsent').single.arguments, {'company': 'Acme', 'guided': true, 'capture': 'app'});
+      await GaiaDeskEmbed.start(options, consent: c);
+      expect((native.named('start').single.arguments as Map)['consent'], c.ref);
+    });
+
+    test('a consent starts one session only', () async {
+      final c = await consentFor(options);
+      final s = await GaiaDeskEmbed.start(options, consent: c);
+      await s.stop();
+      await expectLater(GaiaDeskEmbed.start(options, consent: c), throwsA(refusal('consent_required')));
+      expect(native.named('start'), hasLength(1));
+    });
+
+    test('a consent must match the session: company, guided, capture', () async {
+      final acme = await GaiaDeskEmbed.recordConsent('Acme');
+      await expectLater(
+        GaiaDeskEmbed.start(const EmbedOptions(embedToken: 'gdemb_x', company: 'Evil Corp'), consent: acme),
+        throwsA(refusal('consent_required')),
+      );
+      await expectLater(
+        GaiaDeskEmbed.start(const EmbedOptions(embedToken: 'gdemb_x', company: 'Acme', guided: true), consent: acme),
+        throwsA(refusal('consent_required')),
+      );
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await expectLater(
+        GaiaDeskEmbed.start(const EmbedOptions(embedToken: 'gdemb_x', company: 'Acme', capture: EmbedCapture.screen), consent: acme),
+        throwsA(refusal('consent_required')),
+      );
+      expect(native.named('start'), isEmpty);
+      // Refusals before the native call do not spend it.
+      await GaiaDeskEmbed.start(options, consent: acme);
+      expect(native.named('start'), hasLength(1));
+      // Guided consent covers a view-only session.
+      final guided = await GaiaDeskEmbed.recordConsent('Acme', guided: true);
+      await GaiaDeskEmbed.start(options, consent: guided);
+    });
+
+    test('bad options do not spend the consent', () async {
+      final c = await consentFor(options);
+      await expectLater(
+        GaiaDeskEmbed.start(const EmbedOptions(embedToken: ' ', company: 'Acme'), consent: c),
+        throwsA(refusal('bad_token')),
+      );
+      await GaiaDeskEmbed.start(options, consent: c);
     });
 
     test('the native refusal comes back as EmbedException', () async {
       native.failures['start'] = PlatformException(code: 'consent_required', message: 'the library says no');
       await expectLater(
-        GaiaDeskEmbed.start(options, consentGranted: true),
+        startWithConsent(options),
         throwsA(const EmbedException('consent_required', 'the library says no')),
       );
     });
@@ -52,7 +90,7 @@ void main() {
 
   group('options to channel arguments', () {
     test('defaults', () async {
-      await GaiaDeskEmbed.start(options, consentGranted: true);
+      await startWithConsent(options);
       expect(native.named('start').single.arguments, {
         'embedToken': 'gdemb_test',
         'company': 'Acme',
@@ -62,12 +100,12 @@ void main() {
         'masks': <Object>[],
         'capture': 'app',
         'captureMethod': 'replayKit',
-        'consentGranted': true,
+        'consent': 'c1',
       });
     });
 
     test('everything set, masks as logical {x, y, w, h}', () async {
-      await GaiaDeskEmbed.start(
+      await startWithConsent(
         const EmbedOptions(
           embedToken: 'gdemb_x',
           company: 'Acme Bank',
@@ -78,7 +116,6 @@ void main() {
           capture: EmbedCapture.screen,
           captureMethod: IosCaptureMethod.snapshot,
         ),
-        consentGranted: true,
       );
       final a = native.named('start').single.arguments as Map;
       expect(a['server'], 'https://support.acme.test');
@@ -95,24 +132,24 @@ void main() {
     test('screen capture is refused on iOS, allowed on Android', () async {
       const screen = EmbedOptions(embedToken: 'gdemb_x', company: 'Acme', capture: EmbedCapture.screen);
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      await expectLater(GaiaDeskEmbed.start(screen, consentGranted: true), throwsA(refusal('bad_config')));
-      expect(native.calls, isEmpty);
+      await expectLater(startWithConsent(screen), throwsA(refusal('bad_config')));
+      expect(native.named('start'), isEmpty);
       // iOS takes the capture method.
-      await GaiaDeskEmbed.start(const EmbedOptions(embedToken: 'gdemb_x', company: 'Acme', captureMethod: IosCaptureMethod.snapshot), consentGranted: true);
+      await startWithConsent(const EmbedOptions(embedToken: 'gdemb_x', company: 'Acme', captureMethod: IosCaptureMethod.snapshot));
       expect((native.named('start').single.arguments as Map)['captureMethod'], 'snapshot');
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      await GaiaDeskEmbed.start(screen, consentGranted: true);
+      await startWithConsent(screen);
       expect((native.named('start').last.arguments as Map)['capture'], 'screen');
     });
 
     test('other platforms are refused', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-      await expectLater(GaiaDeskEmbed.start(options, consentGranted: true), throwsA(refusal('unsupported_platform')));
-      expect(native.calls, isEmpty);
+      await expectLater(startWithConsent(options), throwsA(refusal('unsupported_platform')));
+      expect(native.named('start'), isEmpty);
     });
 
     test('bad options are refused before native', () async {
-      Future<void> start(EmbedOptions o) => GaiaDeskEmbed.start(o, consentGranted: true);
+      Future<void> start(EmbedOptions o) => startWithConsent(o);
       await expectLater(start(const EmbedOptions(embedToken: ' ', company: 'Acme')), throwsA(refusal('bad_token')));
       await expectLater(start(const EmbedOptions(embedToken: 'gdemb_x', company: '')), throwsA(refusal('bad_config')));
       await expectLater(start(const EmbedOptions(embedToken: 'gdemb_x', company: 'A', fps: 0)), throwsA(refusal('bad_config')));
@@ -127,7 +164,7 @@ void main() {
         start(const EmbedOptions(embedToken: 'gdemb_x', company: 'A', masks: [Rect.fromLTWH(0, 0, double.infinity, 1)])),
         throwsA(refusal('bad_rects')),
       );
-      expect(native.calls, isEmpty);
+      expect(native.named('start'), isEmpty);
     });
   });
 

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Breaking:** consent is an `EmbedConsent` recorded by the native library, not a bool.
+  `requestConsent` returns `EmbedConsent?`; `recordConsent` records the YES of your own dialog;
+  `start(options, consent:)` takes it once, and refuses one for another company, capture, or a
+  guided session when the user was not asked about guiding (`consent_required`).
+- A pause the customer made on the indicator can only be lifted by them (`setPaused(false)` is
+  ignored meanwhile).
+- iOS: the plugin compiles against GaiaDeskEmbed (its own refusals no longer use the SDK error's
+  initializer).
 - `GaiaDeskMasked`: a moving widget's mask is widened to where it was, is and is heading (one
   frame at its speed) and shrinks back once it stops, instead of trailing it by a frame.
 - Android: masks are refused (`no_activity`) without a foreground activity and Flutter view,

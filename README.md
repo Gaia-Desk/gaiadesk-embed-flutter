@@ -62,15 +62,15 @@ curl -s -X POST https://api.gaiadesk.net/v1/support/sessions \
 import 'package:gaiadesk_embed/gaiadesk_embed.dart';
 
 Future<void> getHelp(String embedToken) async {
-  // 1. Ask.
-  final agreed = await GaiaDeskEmbed.requestConsent('Acme');
-  if (!agreed) return;
+  // 1. Ask: your user's YES, recorded by the native library (null: they declined).
+  final consent = await GaiaDeskEmbed.requestConsent('Acme');
+  if (consent == null) return;
 
-  // 2. Start, with the answer.
+  // 2. Start, with that consent.
   try {
     final help = await GaiaDeskEmbed.start(
       EmbedOptions(embedToken: embedToken, company: 'Acme'),
-      consentGranted: agreed,
+      consent: consent,
     );
     help.events.listen((e) {
       switch (e) {
@@ -97,11 +97,15 @@ help.
 
 ## Consent is required
 
-`start` refuses (`EmbedException` with code `consent_required`) unless `consentGranted` is
-literally `true`, and that must be your user's answer to a consent dialog: `requestConsent` (a
-`UIAlertController` on iOS, an `AlertDialog` on Android) or your own. Say who will see what, and
-whether they can act. The check in Dart is a convenience; the native library makes it again and is
-the real gate.
+`start` takes an `EmbedConsent`: your user's YES, recorded by the native library at the moment
+they gave it. Get it from `requestConsent` (the SDK's dialog: a `UIAlertController` on iOS, an
+`AlertDialog` on Android; null when they decline), or show your own dialog and call
+`recordConsent(company, guided:, capture:)` right when they agree, with exactly what it asked. A
+consent is single-use, expires after 10 minutes, and must match the session: the same company and
+capture, and guided only if the user was asked about guiding. `start` refuses anything else
+(`consent_required`) in Dart, in the native plugin (which keeps the library's token: it never
+reaches Dart) and again in the native library, the real gate. Say who will see what, and whether
+they can act.
 
 ## Masking
 
@@ -131,7 +135,8 @@ offset by the Flutter view's position in the window. `setMaskedRects([])` clears
 Sessions are **view-only by default**. Guided input needs **both** `guided: true` in your options
 **and** a `cobrowse` session (your backend's `mode`). Even then, a request is applied only inside
 your app, while it is in front, not on a mask and not on the indicator. Your customer can pause it
-on the indicator; you can too, with `session.setPaused(true)`. Every request is reported as an
+on the indicator; you can too, with `session.setPaused(true)`. A pause your customer made is
+theirs: `setPaused(false)` does not lift it, only the indicator does. Every request is reported as an
 `EmbedAction` with `applied` and a `reason`.
 
 - **Android: full.** Clicks become taps, scrolling a mouse-wheel scroll, typing key events, all
@@ -176,15 +181,16 @@ ends everything; you get `EmbedEnded('stopped')`.
 
 | | |
 |---|---|
-| `GaiaDeskEmbed.start(options, consentGranted:)` | `Future<EmbedSession>`; throws `EmbedException` (`.code`, `.message`) |
-| `GaiaDeskEmbed.requestConsent(company, {guided, capture})` | `Future<bool>`: the user's answer |
+| `GaiaDeskEmbed.start(options, consent:)` | `Future<EmbedSession>`; throws `EmbedException` (`.code`, `.message`) |
+| `GaiaDeskEmbed.requestConsent(company, {guided, capture})` | `Future<EmbedConsent?>`: the user's YES, null when declined |
+| `GaiaDeskEmbed.recordConsent(company, {guided, capture})` | `Future<EmbedConsent>`: after your own dialog said YES |
 | `GaiaDeskEmbed.buildInfo()` | `Future<EmbedBuildInfo>`: `version`, `codec`, `os`, `arch`, `testSource`, `raw` |
 | `GaiaDeskEmbed.current` | the running `EmbedSession`, or null |
 | `session.events` | `Stream<EmbedEvent>` (broadcast; events before the first listener are kept for it; closes after `EmbedEnded`) |
 | `session.ended` | `Future<String>`: the end reason, completes exactly once |
 | `session.stop()` | end the session (safe to call again); `EmbedEnded('app_stopped')` follows |
 | `session.setMaskedRects(rects)` | replace your own masked rects (logical pixels) |
-| `session.setPaused(paused)` | pause or resume guided input |
+| `session.setPaused(paused)` | pause or resume guided input (not a pause the customer made) |
 | `GaiaDeskMasked(child:)` | paint a widget out of everything shared |
 
 | `EmbedOptions` | |
@@ -236,8 +242,9 @@ flutter test      # Dart: options, events, sessions, masks (a fake native side)
 flutter analyze
 ```
 
-The channel contract: method channel `gaiadesk_embed` (`start` → a plugin session id, `stop`,
-`setMaskedRects`, `setPaused`, `requestConsent`, `buildInfo`) and event channel
+The channel contract: method channel `gaiadesk_embed` (`requestConsent` / `recordConsent` → a
+plugin consent handle or null, `start` (with `consent`: that handle) → a plugin session id,
+`stop`, `setMaskedRects`, `setPaused`, `buildInfo`) and event channel
 `gaiadesk_embed/events` (`{session, event}`, `event` being the library's event JSON, as a map or a
 string).
 

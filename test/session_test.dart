@@ -16,7 +16,7 @@ void main() {
   tearDown(() => native.uninstall());
 
   test('events arrive in order, routed to their session', () async {
-    final s = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final s = await startWithConsent(options);
     final got = <EmbedEvent>[];
     s.events.listen(got.add);
     await native.emit(s.id, {'type': 'state', 'state': 'waiting'});
@@ -32,14 +32,14 @@ void main() {
   });
 
   test('events before the first listener are kept for it', () async {
-    final s = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final s = await startWithConsent(options);
     await native.emit(s.id, {'type': 'code', 'code': '1', 'session_id': 's', 'mode': 'view'});
     final first = await s.events.first;
     expect(first, const EmbedCode(code: '1', sessionId: 's', mode: 'view'));
   });
 
   test('ended completes once, closes events, and nothing follows it', () async {
-    final s = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final s = await startWithConsent(options);
     final got = <EmbedEvent>[];
     final done = Completer<void>();
     s.events.listen(got.add, onDone: done.complete);
@@ -55,14 +55,14 @@ void main() {
   });
 
   test('a session that ended before anyone listened replays then closes', () async {
-    final s = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final s = await startWithConsent(options);
     await native.emit(s.id, {'type': 'error', 'code': 'capture_failed', 'message': 'x'});
     await native.emit(s.id, {'type': 'ended', 'reason': 'error'});
     expect(await s.events.toList(), const [EmbedErrorEvent(code: 'capture_failed', message: 'x'), EmbedEnded('error')]);
   });
 
   test('stop is idempotent and stops after the end', () async {
-    final s = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final s = await startWithConsent(options);
     await Future.wait([s.stop(), s.stop()]);
     await s.stop();
     expect(native.named('stop').map((c) => c.arguments), [
@@ -75,13 +75,13 @@ void main() {
   });
 
   test('stop swallows a native refusal (the session is already gone)', () async {
-    final s = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final s = await startWithConsent(options);
     native.failures['stop'] = PlatformException(code: 'gone');
     await s.stop();
   });
 
   test('setMaskedRects sends logical rects; refuses bad ones; no-op after the end', () async {
-    final s = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final s = await startWithConsent(options);
     await s.setMaskedRects(const [Rect.fromLTWH(1, 2, 3, 4)]);
     expect(native.named('setMaskedRects').single.arguments, {
       'session': s.id,
@@ -102,7 +102,7 @@ void main() {
   });
 
   test('setPaused', () async {
-    final s = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final s = await startWithConsent(options);
     await s.setPaused(true);
     await s.setPaused(false);
     expect(native.named('setPaused').map((c) => c.arguments), [
@@ -112,9 +112,9 @@ void main() {
   });
 
   test('a second session gets its own events', () async {
-    final a = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final a = await startWithConsent(options);
     await native.emit(a.id, {'type': 'ended', 'reason': 'app_stopped'});
-    final b = await GaiaDeskEmbed.start(options, consentGranted: true);
+    final b = await startWithConsent(options);
     expect(b.id, isNot(a.id));
     expect(GaiaDeskEmbed.current, same(b));
     await native.emit(b.id, {'type': 'state', 'state': 'connected'});

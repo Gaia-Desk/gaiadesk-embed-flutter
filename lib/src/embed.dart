@@ -42,6 +42,31 @@ class EmbedBuildInfo {
   final Map<String, Object?> raw;
 }
 
+/// Your user's YES to sharing (from [GaiaDeskEmbed.requestConsent] or
+/// [GaiaDeskEmbed.recordConsent]), bound to what they were asked. Opaque:
+/// the native side holds the library's single-use consent; [GaiaDeskEmbed.start]
+/// takes it once.
+@immutable
+final class EmbedConsent {
+  const EmbedConsent._(this.ref, {required this.company, required this.guided, required this.capture});
+
+  /// The native plugin's handle for it (not the library's token). Not for
+  /// apps: pass the whole value to [GaiaDeskEmbed.start].
+  final String ref;
+
+  /// Who the user agreed to share with.
+  final String company;
+
+  /// Whether they were asked about guided input.
+  final bool guided;
+
+  /// What they agreed to share (Android).
+  final EmbedCapture capture;
+
+  @override
+  String toString() => 'EmbedConsent($company, guided: $guided, capture: ${capture.name})';
+}
+
 /// Start, and ask for consent. See the package README.
 abstract final class GaiaDeskEmbed {
   static const MethodChannel _methods = MethodChannel('gaiadesk_embed');
@@ -56,24 +81,35 @@ abstract final class GaiaDeskEmbed {
   /// The session running in this app, if any.
   static EmbedSession? get current => _current;
 
-  /// Start sharing. [consentGranted] must be your user's answer to a consent
-  /// dialog ([requestConsent], or your own): anything but `true` is refused
-  /// here (`consent_required`), and the native library refuses it again.
-  /// Throws [EmbedException].
-  static Future<EmbedSession> start(EmbedOptions options, {required bool consentGranted}) async {
-    // Literally `true` (a dynamic call can pass anything).
-    if (!identical(consentGranted as Object?, true)) {
-      throw const EmbedException('consent_required', 'ask your user first (GaiaDeskEmbed.requestConsent) and pass their answer as consentGranted');
+  /// Start sharing. [consent] is your user's YES to a consent dialog:
+  /// [requestConsent] (the SDK's), or [recordConsent] right after your own.
+  /// It is single-use, expires after 10 minutes, and must match the session
+  /// (the same company and capture, and guided only if the user was asked
+  /// about guiding): refused here (`consent_required`), and again by the
+  /// native library, which issued it. Throws [EmbedException].
+  static Future<EmbedSession> start(EmbedOptions options, {required EmbedConsent consent}) async {
+    if (consent.company != options.company) {
+      throw const EmbedException('consent_required', 'the consent was given for another company: ask again with this session\'s company');
+    }
+    if (options.guided && !consent.guided) {
+      throw const EmbedException('consent_required', 'a guided session needs consent that asked about guiding (requestConsent(company, guided: true))');
+    }
+    if (consent.capture != options.capture) {
+      throw const EmbedException('consent_required', 'the consent was given for another capture: ask again with this session\'s capture');
     }
     final platform = defaultTargetPlatform;
     if (kIsWeb || (platform != TargetPlatform.iOS && platform != TargetPlatform.android)) {
       throw const EmbedException('unsupported_platform', 'gaiadesk_embed runs on iOS and Android');
     }
     final args = options.toChannelArguments(
-      consentGranted: true,
+      consent: consent.ref,
       platform: platform,
       extraMasks: MaskRegistry.instance.measure(),
     );
+    // Spent here, after every other check: single use, as in the library.
+    if (!_unusedConsents.remove(consent.ref)) {
+      throw const EmbedException('consent_required', 'this consent was already used: ask your user again');
+    }
     _listen();
     final int? id;
     try {
@@ -93,19 +129,44 @@ abstract final class GaiaDeskEmbed {
   }
 
   /// Ask the user, with the native SDK's dialog (UIAlertController on iOS,
-  /// AlertDialog on Android). Pass the answer to [start]. [capture] changes
-  /// the wording on Android only.
-  static Future<bool> requestConsent(String company, {bool guided = false, EmbedCapture capture = EmbedCapture.app}) async {
+  /// AlertDialog on Android). Their YES, for [start]; null when they declined.
+  /// [capture] changes the wording on Android only.
+  static Future<EmbedConsent?> requestConsent(String company, {bool guided = false, EmbedCapture capture = EmbedCapture.app}) async {
     try {
-      final ok = await _methods.invokeMethod<bool>('requestConsent', {
+      final ref = await _methods.invokeMethod<String>('requestConsent', {
         'company': company,
         'guided': guided,
         'capture': capture.name,
       });
-      return ok ?? false;
+      return ref == null ? null : _consent(ref, company, guided, capture);
     } on PlatformException catch (e) {
       throw EmbedException.fromPlatform(e);
     }
+  }
+
+  /// Your own consent dialog said YES: call this right then, with what it
+  /// asked (the company named, whether it said the agent may guide, what is
+  /// shared). Never call it without asking. The native library records the
+  /// answer; the result is what [start] takes.
+  static Future<EmbedConsent> recordConsent(String company, {bool guided = false, EmbedCapture capture = EmbedCapture.app}) async {
+    try {
+      final ref = await _methods.invokeMethod<String>('recordConsent', {
+        'company': company,
+        'guided': guided,
+        'capture': capture.name,
+      });
+      if (ref == null) throw const EmbedException('unknown', 'the native plugin recorded no consent');
+      return _consent(ref, company, guided, capture);
+    } on PlatformException catch (e) {
+      throw EmbedException.fromPlatform(e);
+    }
+  }
+
+  static final Set<String> _unusedConsents = {};
+
+  static EmbedConsent _consent(String ref, String company, bool guided, EmbedCapture capture) {
+    _unusedConsents.add(ref);
+    return EmbedConsent._(ref, company: company, guided: guided, capture: capture);
   }
 
   /// What the bundled native library is.
@@ -127,6 +188,7 @@ abstract final class GaiaDeskEmbed {
     _early.clear();
     _highestId = 0;
     _current = null;
+    _unusedConsents.clear();
   }
 
   static void _listen() {

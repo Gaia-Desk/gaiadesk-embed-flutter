@@ -34,10 +34,8 @@ void main() {
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(top: 100));
-    await tester.runAsync(() => GaiaDeskEmbed.start(
-          const EmbedOptions(embedToken: 'gdemb_x', company: 'Acme', masks: [Rect.fromLTWH(0, 0, 10, 10)]),
-          consentGranted: true,
-        ));
+    const o = EmbedOptions(embedToken: 'gdemb_x', company: 'Acme', masks: [Rect.fromLTWH(0, 0, 10, 10)]);
+    await tester.runAsync(() => startWithConsent(o));
     final masks = (native.named('start').single.arguments as Map)['masks'];
     expect(masks, [
       {'x': 0.0, 'y': 0.0, 'w': 10.0, 'h': 10.0},
@@ -47,7 +45,7 @@ void main() {
 
   testWidgets('moving or removing it updates the running session, keeping the app masks', (tester) async {
     await tester.pumpWidget(_app(top: 100));
-    final s = (await tester.runAsync(() => GaiaDeskEmbed.start(options, consentGranted: true)))!;
+    final s = (await tester.runAsync(() => startWithConsent(options)))!;
     await tester.runAsync(() => s.setMaskedRects(const [Rect.fromLTWH(1, 1, 1, 1)]));
     native.calls.clear();
 
@@ -92,7 +90,7 @@ void main() {
 
   testWidgets('a widget scrolling a step per frame stays covered where it lands next', (tester) async {
     await tester.pumpWidget(_app(top: 100));
-    final s = (await tester.runAsync(() => GaiaDeskEmbed.start(options, consentGranted: true)))!;
+    final s = (await tester.runAsync(() => startWithConsent(options)))!;
     native.calls.clear();
     for (final top in [110.0, 120.0, 130.0]) {
       await tester.pumpWidget(_app(top: top));

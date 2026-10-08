@@ -63,7 +63,9 @@ class EmbedSession {
     await _sendMasks();
   }
 
-  /// Pause (or resume) guided input, as the indicator's own button does.
+  /// Pause (or resume) guided input. A pause your customer chose on the
+  /// indicator is theirs: only they can lift it, and `setPaused(false)` is
+  /// ignored until they do (the native SDKs and library enforce this).
   Future<void> setPaused(bool paused) async {
     if (isEnded) return;
     try {

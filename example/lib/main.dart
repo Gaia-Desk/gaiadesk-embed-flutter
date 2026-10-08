@@ -104,8 +104,11 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     // 1. Ask. 2. Start with the answer.
-    final agreed = demoFlag('GAIADESK_DEMO_TEST_CONSENT') || await GaiaDeskEmbed.requestConsent(_company, guided: _guided);
-    if (!agreed) {
+    // Tests only: the test hooks stand in for the user pressing Share.
+    final consent = demoFlag('GAIADESK_DEMO_TEST_CONSENT')
+        ? await GaiaDeskEmbed.recordConsent(_company, guided: _guided)
+        : await GaiaDeskEmbed.requestConsent(_company, guided: _guided);
+    if (consent == null) {
       setState(() => _status = 'You chose not to share');
       return;
     }
@@ -118,7 +121,7 @@ class _HomePageState extends State<HomePage> {
           guided: _guided,
           captureMethod: demoEnv('GAIADESK_DEMO_CAPTURE') == 'snapshot' ? IosCaptureMethod.snapshot : IosCaptureMethod.replayKit,
         ),
-        consentGranted: agreed,
+        consent: consent,
       );
       setState(() {
         _session = session;

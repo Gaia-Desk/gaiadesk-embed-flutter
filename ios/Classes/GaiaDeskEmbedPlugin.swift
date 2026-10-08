@@ -1,7 +1,8 @@
 // The iOS side of gaiadesk_embed: the method channel `gaiadesk_embed` and the
 // event channel `gaiadesk_embed/events` over the GaiaDeskEmbed pod.
 //
-// The SDK owns everything that matters (consent check, the "Sharing with …"
+// The SDK owns everything that matters (consent recorded and checked by the
+// library, the "Sharing with …"
 // indicator, capturing only this app, masking before encoding, guided input).
 // This class only converts. Dart's logical pixels are UIKit points, and the
 // Flutter view fills the key window, so mask rects pass through unchanged.
@@ -23,6 +24,10 @@ public final class GaiaDeskEmbedPlugin: NSObject, FlutterPlugin, FlutterStreamHa
     private var pending: [[String: Any]] = []
     private var sessions: [Int: GaiaDeskEmbed] = [:]
     private var nextId = 1
+    /// Consents the library recorded, by the handle Dart holds (the token
+    /// itself never crosses the channel). Single use: `start` takes one out.
+    private var consents: [String: GaiaDeskEmbed.Consent] = [:]
+    private var nextConsent = 1
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = GaiaDeskEmbedPlugin()
@@ -73,8 +78,15 @@ public final class GaiaDeskEmbedPlugin: NSObject, FlutterPlugin, FlutterStreamHa
                 let company = args["company"] as? String ?? ""
                 let guided = args["guided"] as? Bool ?? false
                 Task { @MainActor in
-                    result(await GaiaDeskEmbed.requestConsent(company: company, guided: guided))
+                    let consent = await GaiaDeskEmbed.requestConsent(company: company, guided: guided)
+                    result(consent.map { self.keep($0) })
                 }
+            case "recordConsent":
+                if args["capture"] as? String == "screen" {
+                    throw PluginError(code: "bad_config", message: "capture: screen is Android only; iOS shares the app alone")
+                }
+                let consent = try GaiaDeskEmbed.recordConsent(company: args["company"] as? String ?? "", guided: args["guided"] as? Bool ?? false)
+                result(keep(consent))
             case "buildInfo":
                 result(GaiaDeskEmbed.buildInfo)
             default:
@@ -87,6 +99,13 @@ public final class GaiaDeskEmbedPlugin: NSObject, FlutterPlugin, FlutterStreamHa
         } catch {
             result(FlutterError(code: "unknown", message: "\(error)", details: nil))
         }
+    }
+
+    private func keep(_ consent: GaiaDeskEmbed.Consent) -> String {
+        let ref = "c\(nextConsent)"
+        nextConsent += 1
+        consents[ref] = consent
+        return ref
     }
 
     @MainActor
@@ -112,7 +131,10 @@ public final class GaiaDeskEmbedPlugin: NSObject, FlutterPlugin, FlutterStreamHa
         )
         let id = nextId
         nextId += 1
-        let embed = try GaiaDeskEmbed.start(config, consentGranted: args["consentGranted"] as? Bool ?? false) { [weak self] event in
+        guard let ref = args["consent"] as? String, let consent = consents.removeValue(forKey: ref) else {
+            throw PluginError(code: "consent_required", message: "ask your user first (requestConsent, or recordConsent after your own dialog); a consent starts one session")
+        }
+        let embed = try GaiaDeskEmbed.start(config, consent: consent) { [weak self] event in
             guard let self else { return }
             if case .ended = event { self.sessions.removeValue(forKey: id) }
             self.send(id, Self.map(event))

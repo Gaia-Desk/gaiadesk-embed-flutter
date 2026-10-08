@@ -1,7 +1,8 @@
 // The Android side of gaiadesk_embed: the method channel `gaiadesk_embed` and
 // the event channel `gaiadesk_embed/events` over net.gaiadesk:embed-android.
 //
-// The SDK owns everything that matters (consent check, the "Sharing with …"
+// The SDK owns everything that matters (consent recorded and checked by the
+// library, the "Sharing with …"
 // indicator, masking before encoding, guided input delivered as touch and key
 // events into this activity's window, so into the Flutter view). This class
 // only converts: Dart's logical pixels to window pixels, and the SDK's events
@@ -32,6 +33,19 @@ class GaiaDeskEmbedPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
     private val pending = ArrayDeque<Map<String, Any?>>()
     private val sessions = HashMap<Int, GaiaDeskEmbed>()
     private var nextId = 1
+
+    /**
+     * Consents the library recorded, by the handle Dart holds (the token itself never crosses the
+     * channel). Single use: `start` takes one out.
+     */
+    private val consents = HashMap<String, GaiaDeskEmbed.Consent>()
+    private var nextConsent = 1
+
+    private fun keep(consent: GaiaDeskEmbed.Consent): String {
+        val ref = "c${nextConsent++}"
+        consents[ref] = consent
+        return ref
+    }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         methods = MethodChannel(binding.binaryMessenger, "gaiadesk_embed").also { it.setMethodCallHandler(this) }
@@ -91,6 +105,14 @@ class GaiaDeskEmbedPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
                     result.success(null)
                 }
                 "requestConsent" -> requestConsent(call, result)
+                "recordConsent" -> {
+                    val consent = GaiaDeskEmbed.recordConsent(
+                        call.argument<String>("company") ?: "",
+                        call.argument<Boolean>("guided") == true,
+                        capture(call),
+                    )
+                    result.success(keep(consent))
+                }
                 "buildInfo" -> result.success(GaiaDeskEmbed.buildInfo)
                 else -> result.notImplemented()
             }
@@ -105,10 +127,7 @@ class GaiaDeskEmbedPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
 
     private fun start(call: MethodCall, result: MethodChannel.Result) {
         val act = activity ?: return result.error("no_activity", "gaiadesk_embed needs a foreground activity to share", null)
-        val capture = when (call.argument<String>("capture")) {
-            "screen" -> GaiaDeskEmbed.Capture.SCREEN
-            else -> GaiaDeskEmbed.Capture.APP
-        }
+        val capture = capture(call)
         val config = GaiaDeskEmbed.Configuration(
             embedToken = call.argument<String>("embedToken") ?: "",
             company = call.argument<String>("company") ?: "",
@@ -118,7 +137,8 @@ class GaiaDeskEmbedPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
             maskedRects = rects(call.argument<List<Map<String, Number>>>("masks")),
             capture = capture,
         )
-        val consent = call.argument<Boolean>("consentGranted") == true
+        val consent = call.argument<String>("consent")?.let { consents.remove(it) }
+            ?: return result.error("consent_required", "ask your user first (requestConsent, or recordConsent after your own dialog); a consent starts one session", null)
         val id = nextId++
         val embed = GaiaDeskEmbed.start(act, config, consent) { e ->
             if (e is GaiaDeskEmbed.Event.Ended) sessions.remove(id)
@@ -130,14 +150,16 @@ class GaiaDeskEmbedPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
 
     private fun requestConsent(call: MethodCall, result: MethodChannel.Result) {
         val act = activity ?: return result.error("no_activity", "gaiadesk_embed needs a foreground activity to ask", null)
-        val capture = if (call.argument<String>("capture") == "screen") GaiaDeskEmbed.Capture.SCREEN else GaiaDeskEmbed.Capture.APP
         GaiaDeskEmbed.requestConsent(
             act,
             call.argument<String>("company") ?: "",
             call.argument<Boolean>("guided") == true,
-            capture,
-        ) { result.success(it) }
+            capture(call),
+        ) { consent -> result.success(consent?.let { keep(it) }) }
     }
+
+    private fun capture(call: MethodCall): GaiaDeskEmbed.Capture =
+        if (call.argument<String>("capture") == "screen") GaiaDeskEmbed.Capture.SCREEN else GaiaDeskEmbed.Capture.APP
 
     /**
      * Dart's logical pixels (from the Flutter view's top-left) → window pixels.
