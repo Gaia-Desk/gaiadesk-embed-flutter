@@ -34,9 +34,15 @@ to your Runner target (the example's Podfile does this when `GAIADESK_EMBED_IOS_
 
 **Android** (minSdk 26): the plugin depends on `net.gaiadesk:embed-android:0.1.0` (the Kotlin SDK
 and `libgaiadesk_embed.so` for arm64-v8a, armeabi-v7a and x86_64) from Maven Central. Set
-`minSdk = 26` in `android/app/build.gradle.kts`. For a local copy, run
-`./gradlew :embed:publishToMavenLocal` in `gaiadesk-embed-android` and add `mavenLocal()` to your
-repositories (the example does).
+`minSdk = 26` in `android/app/build.gradle.kts`. Overrides, in your `android/gradle.properties`
+(or as environment variables):
+
+- `GaiaDeskEmbed_embedAndroidMavenLocal=true` (`GAIADESK_EMBED_ANDROID_MAVEN_LOCAL=1`): resolve it
+  from `~/.m2` as well, after `./gradlew :embed:publishToMavenLocal` in `gaiadesk-embed-android`
+  (the example also lists `mavenLocal()` itself);
+- `GaiaDeskEmbed_embedAndroidAar=/path/to/embed-android-0.1.0.aar` (`GAIADESK_EMBED_ANDROID_AAR`):
+  that AAR file instead (e.g. the one attached to a gaiadesk-embed-android release);
+- `GaiaDeskEmbed_embedAndroidVersion=<version>`: another published version.
 
 ## Quick start
 
@@ -222,6 +228,20 @@ The channel contract: method channel `gaiadesk_embed` (`start` → a plugin sess
 `setMaskedRects`, `setPaused`, `requestConsent`, `buildInfo`) and event channel
 `gaiadesk_embed/events` (`{session, event}`, `event` being the library's event JSON, as a map or a
 string).
+
+## Releasing (maintainers)
+
+Publish the native SDKs first (the `GaiaDeskEmbed` pod on CocoaPods trunk, `net.gaiadesk:embed-android`
+on Maven Central): this plugin only depends on them. Then, with the version bumped in
+`pubspec.yaml`, `ios/gaiadesk_embed.podspec`, `android/build.gradle.kts` and `CHANGELOG.md`:
+
+```sh
+flutter analyze && flutter test
+flutter pub publish --dry-run          # must end with "Package has 0 warnings."
+git tag v0.1.0 && git push origin main v0.1.0
+flutter pub publish                    # a pub.dev account (Google sign-in) that is an uploader;
+                                       # the first upload creates the package
+```
 
 ## Licences
 

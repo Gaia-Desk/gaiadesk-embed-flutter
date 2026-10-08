@@ -55,6 +55,28 @@ kotlin {
     }
 }
 
+// net.gaiadesk:embed-android: the published AAR from Maven Central by default.
+// Overrides (the app's android/gradle.properties, -P, or env vars):
+//   GaiaDeskEmbed_embedAndroidVersion=<v>        another published version
+//   GaiaDeskEmbed_embedAndroidMavenLocal=true    (GAIADESK_EMBED_ANDROID_MAVEN_LOCAL=1)
+//       resolve it from ~/.m2 too, after `./gradlew :embed:publishToMavenLocal`
+//       in gaiadesk-embed-android (adds mavenLocal() to every project of the build)
+//   GaiaDeskEmbed_embedAndroidAar=/path/to.aar   (GAIADESK_EMBED_ANDROID_AAR)
+//       a local AAR file instead (app builds: `flutter build apk`/`flutter run`)
+val embedAndroidVersion = (findProperty("GaiaDeskEmbed_embedAndroidVersion") as String?) ?: "0.1.0"
+val embedAndroidAar = (findProperty("GaiaDeskEmbed_embedAndroidAar") as String?)
+    ?: System.getenv("GAIADESK_EMBED_ANDROID_AAR")
+val embedAndroidMavenLocal = ((findProperty("GaiaDeskEmbed_embedAndroidMavenLocal") as String?)
+    ?: System.getenv("GAIADESK_EMBED_ANDROID_MAVEN_LOCAL") ?: "") in setOf("1", "true")
+
+if (embedAndroidMavenLocal) {
+    rootProject.allprojects { repositories { mavenLocal() } }
+}
+
 dependencies {
-    implementation("net.gaiadesk:embed-android:0.1.0")
+    if (!embedAndroidAar.isNullOrEmpty()) {
+        implementation(files(embedAndroidAar))
+    } else {
+        implementation("net.gaiadesk:embed-android:$embedAndroidVersion")
+    }
 }

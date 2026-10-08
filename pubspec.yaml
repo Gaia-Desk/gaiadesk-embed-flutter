@@ -9,10 +9,18 @@ version: 0.1.0
 homepage: https://gaiadesk.net
 repository: https://github.com/Gaia-Desk/gaiadesk-embed-flutter
 issue_tracker: https://github.com/Gaia-Desk/gaiadesk-embed-flutter/issues
+documentation: https://github.com/Gaia-Desk/gaiadesk-embed-flutter#readme
 topics:
   - support
   - screen-sharing
   - cobrowsing
+  - customer-support
+  - remote-assistance
+
+# Phones only: the native SDKs are iOS (GaiaDeskEmbed pod) and Android (net.gaiadesk:embed-android).
+platforms:
+  android:
+  ios:
 
 environment:
   sdk: ^3.5.0

@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Dependencies
+        run: flutter pub get && (cd example && flutter pub get)
+      - name: Analyze (plugin and example)
+        run: flutter analyze
+      - name: Tests (plugin; fake native side)
+        run: flutter test
+      - name: Tests (example)
+        run: cd example && flutter test
+      - name: pub.dev package check
+        run: flutter pub publish --dry-run
