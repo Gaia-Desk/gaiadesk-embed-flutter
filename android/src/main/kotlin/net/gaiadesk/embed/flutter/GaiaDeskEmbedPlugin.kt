@@ -139,13 +139,21 @@ class GaiaDeskEmbedPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
         ) { result.success(it) }
     }
 
-    /** Dart's logical pixels (from the Flutter view's top-left) → window pixels. */
+    /**
+     * Dart's logical pixels (from the Flutter view's top-left) → window pixels.
+     * Without an activity and its Flutter view there is no density or offset to
+     * convert with, and a guess (density 1, offset 0) would mask the wrong
+     * place: refused (`no_activity`) instead.
+     */
     private fun rects(raw: List<Map<String, Number>>?): List<RectF> {
         if (raw.isNullOrEmpty()) return emptyList()
         val act = activity
-        val density = act?.resources?.displayMetrics?.density ?: 1f
+            ?: throw GaiaDeskEmbedException("no_activity", "gaiadesk_embed needs a foreground activity to place masks")
+        val view = act.window?.decorView?.let { flutterView(it) }
+            ?: throw GaiaDeskEmbedException("no_activity", "gaiadesk_embed found no Flutter view to place masks in")
+        val density = act.resources.displayMetrics.density
         val at = IntArray(2)
-        act?.window?.decorView?.let { flutterView(it) }?.getLocationInWindow(at)
+        view.getLocationInWindow(at)
         return raw.map { r ->
             val x = (r["x"]?.toFloat() ?: 0f) * density + at[0]
             val y = (r["y"]?.toFloat() ?: 0f) * density + at[1]

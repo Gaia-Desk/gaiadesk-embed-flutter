@@ -111,9 +111,14 @@ GaiaDeskMasked(child: CardNumber(card))
 
 A `GaiaDeskMasked` widget reports its rect (logical pixels, from the top-left of the Flutter view)
 after every frame and keeps the running session's masks current. Widgets on screen when you call
-`start` are masked from the very first frame. A mask follows a moving widget one frame later, so
-for content that scrolls fast, mask the area it scrolls in, or a larger ancestor: masking too much
-is safe, too little is not.
+`start` are masked from the very first frame. A mask reaches the native side after the frame that
+moved its widget, so while a masked widget moves (scrolling, an animation) its mask is widened to
+cover where it was, where it is and where it is heading at its current speed, and shrinks back to
+the exact rect once it is still. A widget that jumps (appears, or moves abruptly) can still show for
+one frame, so for such content mask the area it moves in, or a larger ancestor: masking too much is
+safe, too little is not. On Android, masks need the foreground activity's Flutter view to be placed;
+without one, `setMaskedRects` and `start` with masks are refused (`no_activity`) rather than
+placed at a guess.
 
 Regions you know yourself go in `EmbedOptions.masks` at start and `session.setMaskedRects(rects)`
 afterwards (`Rect`s in logical pixels, e.g. from `RenderBox.localToGlobal`); these replace each
@@ -132,11 +137,14 @@ on the indicator; you can too, with `session.setPaused(true)`. Every request is 
 - **Android: full.** Clicks become taps, scrolling a mouse-wheel scroll, typing key events, all
   dispatched into your activity's own window, so into the Flutter view, which handles them like
   any touch or hardware key (a focused `TextField` receives typing).
-- **iOS: partial.** iOS has no public way to synthesise a touch. The SDK activates UIKit controls,
-  text fields and scroll views directly, but Flutter draws your whole UI in one view, so a guided
-  click on a Flutter widget shows your customer a **"Tap here"** ring instead and is reported as
-  `EmbedAction(applied: false, reason: 'hint_shown')`. Typing goes into the first responder (a
-  focused Flutter `TextField` is one). Pointer and highlight are drawn.
+- **iOS: hints, not taps.** iOS has no public way to synthesise a touch. The native SDK presses
+  UIKit controls directly, but Flutter renders its own widgets into one view, with no UIKit
+  control behind a button, so in a Flutter app a guided click **never presses anything**: your
+  customer sees a **"Tap here"** ring at that spot and taps it themselves, and the agent gets
+  `EmbedAction(applied: false, reason: 'hint_shown')` (the console shows the session as "shown
+  where to tap"). Clicks on a masked widget are refused (`masked`), and paused input is refused
+  (`control_paused`). Typing goes into the first responder (a focused Flutter `TextField` is
+  one). Pointer and highlight are drawn. Plan your support flow on iOS as guiding, not driving.
 
 ## The indicator
 
