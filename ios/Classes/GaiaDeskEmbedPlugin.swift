@@ -10,6 +10,13 @@ import Flutter
 import GaiaDeskEmbed
 import UIKit
 
+/// A refusal made here, before the SDK is asked (GaiaDeskEmbedError has no
+/// public initializer).
+struct PluginError: Error {
+    let code: String
+    let message: String
+}
+
 public final class GaiaDeskEmbedPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
     private var sink: FlutterEventSink?
     /// Events sent while Dart was not listening (bounded).
@@ -75,6 +82,8 @@ public final class GaiaDeskEmbedPlugin: NSObject, FlutterPlugin, FlutterStreamHa
             }
         } catch let e as GaiaDeskEmbedError {
             result(FlutterError(code: e.code, message: e.message, details: nil))
+        } catch let e as PluginError {
+            result(FlutterError(code: e.code, message: e.message, details: nil))
         } catch {
             result(FlutterError(code: "unknown", message: "\(error)", details: nil))
         }
@@ -83,12 +92,12 @@ public final class GaiaDeskEmbedPlugin: NSObject, FlutterPlugin, FlutterStreamHa
     @MainActor
     private func start(_ args: [String: Any]) throws -> Int {
         if args["capture"] as? String == "screen" {
-            throw GaiaDeskEmbedError(code: "bad_config", message: "capture: screen is Android only; iOS shares the app alone")
+            throw PluginError(code: "bad_config", message: "capture: screen is Android only; iOS shares the app alone")
         }
         var server: URL?
         if let s = args["server"] as? String {
             guard let u = URL(string: s) else {
-                throw GaiaDeskEmbedError(code: "bad_server", message: "server must be an http(s) URL (got \"\(s)\")")
+                throw PluginError(code: "bad_server", message: "server must be an http(s) URL (got \"\(s)\")")
             }
             server = u
         }
