@@ -59,6 +59,12 @@ class _HomePageState extends State<HomePage> {
   final _cardKey = GlobalKey();
   final _blueKey = GlobalKey();
   final _buyKey = GlobalKey();
+  final _pinKey = GlobalKey();
+  final _noteKey = GlobalKey();
+  final _pin = TextEditingController();
+  final _note = TextEditingController();
+  final _pinFocus = FocusNode();
+  final _noteFocus = FocusNode();
   Timer? _commands;
 
   @override
@@ -73,6 +79,8 @@ class _HomePageState extends State<HomePage> {
         'card': demoBox(_cardKey),
         'blue': demoBox(_blueKey),
         'buy': demoBox(_buyKey),
+        'pin': demoBox(_pinKey),
+        'note': demoBox(_noteKey),
       });
       if (_autostart && _token.isNotEmpty) _getHelp();
     });
@@ -86,6 +94,14 @@ class _HomePageState extends State<HomePage> {
         _session?.setPaused(true);
       case 'resume':
         _session?.setPaused(false);
+      // Focus a field as the customer's tap would (a guided click on a
+      // Flutter widget only shows a hint).
+      case 'focus_pin':
+        _pinFocus.requestFocus();
+      case 'focus_note':
+        _noteFocus.requestFocus();
+      case 'unfocus':
+        FocusManager.instance.primaryFocus?.unfocus();
     }
   }
 
@@ -94,6 +110,10 @@ class _HomePageState extends State<HomePage> {
     _commands?.cancel();
     _session?.stop();
     _tokenField.dispose();
+    _pin.dispose();
+    _note.dispose();
+    _pinFocus.dispose();
+    _noteFocus.dispose();
     super.dispose();
   }
 
@@ -203,6 +223,26 @@ class _HomePageState extends State<HomePage> {
               demoEmit({'bought': _bought});
             },
             child: Text(_bought == 0 ? 'Buy' : 'Bought $_bought'),
+          ),
+          const SizedBox(height: 12),
+          // Obscured: masked and never typed into by the agent, without a
+          // GaiaDeskMasked around it.
+          TextField(
+            key: _pinKey,
+            controller: _pin,
+            focusNode: _pinFocus,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            onChanged: (v) => demoEmit({'pin_len': v.length}),
+            decoration: const InputDecoration(labelText: 'PIN', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: _noteKey,
+            controller: _note,
+            focusNode: _noteFocus,
+            onChanged: (v) => demoEmit({'note': v}),
+            decoration: const InputDecoration(labelText: 'Note to support', border: OutlineInputBorder()),
           ),
           const SizedBox(height: 24),
           TextField(

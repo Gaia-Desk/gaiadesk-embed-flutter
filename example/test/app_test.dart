@@ -7,6 +7,8 @@ void main() {
     expect(find.text('4111 1111 1111 1111'), findsOneWidget);
     expect(find.text('Buy'), findsOneWidget);
     expect(find.text('Get help'), findsOneWidget);
+    await tester.ensureVisible(find.text('Get help'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Get help'));
     await tester.pump();
     expect(find.textContaining('Paste an embed token'), findsOneWidget);

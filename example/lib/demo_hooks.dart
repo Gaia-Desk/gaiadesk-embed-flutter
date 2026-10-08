@@ -7,14 +7,16 @@
 //   GAIADESK_DEMO_TEST_CONSENT=1            answer the consent dialog "Share" (tests only)
 //   GAIADESK_DEMO_GUIDED=1                  allow guided input
 //   GAIADESK_DEMO_CAPTURE=snapshot          iOS: capture by snapshot (the Simulator has no ReplayKit)
-//   GAIADESK_DEMO_CMD=1                     run stop|pause|resume written to <app tmp>/gaiadesk-demo-cmd
+//   GAIADESK_DEMO_CMD=1                     run stop|pause|resume|focus_pin|focus_note|unfocus written to
+//                                           <app tmp>/gaiadesk-demo-cmd
 //
 // With any GAIADESK_DEMO_* set, the app prints one JSON object per line
 // (`gaiadesk_demo {...}`, through `print`: the device log, `flutter logs`),
 // and appends it to `<app tmp>/gaiadesk-demo-events.jsonl` (the Simulator's
 // unified log can drop lines; tests read the file): `{"type":"demo", "frame", "card", "blue", "buy"}`
-// (rects as [x, y, w, h] in logical pixels), every embed event as the
-// library's JSON, `{"bought": n}`, `{"start_error": code}`.
+// (and "pin", "note"; rects as [x, y, w, h] in logical pixels), every embed
+// event as the library's JSON, `{"bought": n}`, `{"pin_len": n}`,
+// `{"note": text}`, `{"start_error": code}`.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
