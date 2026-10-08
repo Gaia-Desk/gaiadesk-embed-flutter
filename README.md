@@ -223,7 +223,11 @@ flutter run --dart-define=GAIADESK_EMBED_TOKEN=gdemb_… \
 ```
 
 Every event is printed as one line (`flutter logs`). On the iOS Simulator, switch the example to
-`IosCaptureMethod.snapshot`.
+`IosCaptureMethod.snapshot`. For tests, the example also reads the same `GAIADESK_DEMO_*`
+environment variables as the native iOS examples (`example/lib/demo_hooks.dart`; on the Simulator
+pass them as `SIMCTL_CHILD_*` to `xcrun simctl launch`): autostart, test-only consent, guided,
+snapshot capture, and stop/pause/resume through a command file. GaiaDesk's
+`e2e/embed-flutter-ios-sim.mts` drives it against a real server and console.
 
 ## Development
 

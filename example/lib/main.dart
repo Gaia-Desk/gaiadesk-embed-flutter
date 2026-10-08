@@ -5,13 +5,22 @@
 //               [--dart-define=GAIADESK_SERVER=https://…] \
 //               [--dart-define=GAIADESK_DEMO_AUTOSTART=1]
 //
-// Every event is printed as one line (`flutter logs`).
+// Every event is printed as one line (`flutter logs`). Tests drive it through
+// the environment instead (demo_hooks.dart).
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:gaiadesk_embed/gaiadesk_embed.dart';
 
-const _token = String.fromEnvironment('GAIADESK_EMBED_TOKEN');
-const _server = String.fromEnvironment('GAIADESK_SERVER');
-const _autostart = bool.fromEnvironment('GAIADESK_DEMO_AUTOSTART') || String.fromEnvironment('GAIADESK_DEMO_AUTOSTART') == '1';
+import 'demo_hooks.dart';
+
+const _definedToken = String.fromEnvironment('GAIADESK_EMBED_TOKEN');
+const _definedServer = String.fromEnvironment('GAIADESK_SERVER');
+final _token = _definedToken.isNotEmpty ? _definedToken : demoEnv('GAIADESK_EMBED_TOKEN') ?? '';
+final _server = _definedServer.isNotEmpty ? _definedServer : demoEnv('GAIADESK_SERVER') ?? '';
+final _autostart = const bool.fromEnvironment('GAIADESK_DEMO_AUTOSTART') ||
+    const String.fromEnvironment('GAIADESK_DEMO_AUTOSTART') == '1' ||
+    demoFlag('GAIADESK_DEMO_AUTOSTART');
 const _company = 'Acme Bank';
 
 void main() => runApp(const AcmeBankApp());
@@ -41,19 +50,44 @@ class _HomePageState extends State<HomePage> {
   EmbedSession? _session;
   String _status = 'Not sharing';
   String? _code;
-  bool _guided = false;
+  bool _guided = demoFlag('GAIADESK_DEMO_GUIDED');
   int _bought = 0;
+  final _cardKey = GlobalKey();
+  final _blueKey = GlobalKey();
+  final _buyKey = GlobalKey();
+  Timer? _commands;
 
   @override
   void initState() {
     super.initState();
-    if (_autostart && _token.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _getHelp());
+    _commands = watchDemoCommands(_demoCommand);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final size = MediaQuery.sizeOf(context);
+      demoEmit({
+        'type': 'demo',
+        'frame': [size.width, size.height],
+        'card': demoBox(_cardKey),
+        'blue': demoBox(_blueKey),
+        'buy': demoBox(_buyKey),
+      });
+      if (_autostart && _token.isNotEmpty) _getHelp();
+    });
+  }
+
+  void _demoCommand(String cmd) {
+    switch (cmd) {
+      case 'stop':
+        _session?.stop();
+      case 'pause':
+        _session?.setPaused(true);
+      case 'resume':
+        _session?.setPaused(false);
     }
   }
 
   @override
   void dispose() {
+    _commands?.cancel();
     _session?.stop();
     _tokenField.dispose();
     super.dispose();
@@ -66,7 +100,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     // 1. Ask. 2. Start with the answer.
-    final agreed = await GaiaDeskEmbed.requestConsent(_company, guided: _guided);
+    final agreed = demoFlag('GAIADESK_DEMO_TEST_CONSENT') || await GaiaDeskEmbed.requestConsent(_company, guided: _guided);
     if (!agreed) {
       setState(() => _status = 'You chose not to share');
       return;
@@ -78,6 +112,7 @@ class _HomePageState extends State<HomePage> {
           company: _company,
           server: _server.isEmpty ? null : _server,
           guided: _guided,
+          captureMethod: demoEnv('GAIADESK_DEMO_CAPTURE') == 'snapshot' ? IosCaptureMethod.snapshot : IosCaptureMethod.replayKit,
         ),
         consentGranted: agreed,
       );
@@ -96,12 +131,14 @@ class _HomePageState extends State<HomePage> {
       }
     } on EmbedException catch (e) {
       debugPrint('gaiadesk_embed refused: ${e.code} ${e.message}');
+      demoEmit({'start_error': e.code, 'message': e.message});
       setState(() => _status = 'Could not start: ${e.code}');
     }
   }
 
   void _onEvent(EmbedEvent e) {
     debugPrint('gaiadesk_embed event: $e');
+    demoEmit(demoEventJson(e));
     setState(() {
       switch (e) {
         case EmbedState(:final state):
@@ -133,8 +170,9 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.all(16),
         children: [
           // Painted out of every frame support sees.
-          const GaiaDeskMasked(
-            child: Card(
+          GaiaDeskMasked(
+            key: _cardKey,
+            child: const Card(
               child: ListTile(
                 leading: Icon(Icons.credit_card),
                 title: Text('4111 1111 1111 1111'),
@@ -143,8 +181,20 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 12),
+          Container(
+            key: _blueKey,
+            height: 64,
+            alignment: Alignment.center,
+            color: const Color(0xFF1F5FBF),
+            child: const Text('Balance shown to support', style: TextStyle(color: Colors.white)),
+          ),
+          const SizedBox(height: 12),
           FilledButton(
-            onPressed: () => setState(() => _bought++),
+            key: _buyKey,
+            onPressed: () {
+              setState(() => _bought++);
+              demoEmit({'bought': _bought});
+            },
             child: Text(_bought == 0 ? 'Buy' : 'Bought $_bought'),
           ),
           const SizedBox(height: 24),
