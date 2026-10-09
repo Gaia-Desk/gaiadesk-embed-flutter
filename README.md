@@ -1,8 +1,13 @@
 # gaiadesk_embed (Flutter)
 
-A **"Get help" button for your Flutter app** on iOS and Android. Your customer taps it and agrees;
-**your app's own screen** is shared with **your** support team, who see it in the GaiaDesk
-console's Support page and, if you allow it, guide it.
+[![CI](https://github.com/Gaia-Desk/gaiadesk-embed-flutter/actions/workflows/ci.yml/badge.svg)](https://github.com/Gaia-Desk/gaiadesk-embed-flutter/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Gaia-Desk/gaiadesk-embed-flutter)](https://github.com/Gaia-Desk/gaiadesk-embed-flutter/releases/latest)
+[![License: MIT + binary licence](https://img.shields.io/badge/license-MIT%20%2B%20binary%20licence-blue)](#licences)
+
+A **"Get help" button for your Flutter app** on iOS and Android: in-app remote support and a
+screen sharing SDK for Flutter, for customer support with optional guided control. Your customer
+taps it and agrees; **your app's own screen** is shared with **your** support team, who see it in
+the GaiaDesk console's Support page and, if you allow it, guide it.
 
 - Dart API over GaiaDesk's mobile embed SDKs: the `GaiaDeskEmbed` pod on iOS and
   `net.gaiadesk:embed-android` on Android. No other dependencies.
@@ -20,11 +25,33 @@ console's Support page and, if you allow it, guide it.
 
 ## Install
 
+Not on pub.dev yet; use the release tag from GitHub:
+
 ```yaml
 # pubspec.yaml
 dependencies:
+  gaiadesk_embed:
+    git:
+      url: https://github.com/Gaia-Desk/gaiadesk-embed-flutter.git
+      ref: v0.1.0
+```
+
+Once published to pub.dev:
+
+```yaml
+dependencies:
   gaiadesk_embed: ^0.1.0
 ```
+
+The native SDKs it builds on are not on CocoaPods trunk or Maven Central yet either; until they
+are, take them from their GitHub releases:
+
+- iOS, in `ios/Podfile` inside `target 'Runner'`:
+  `pod 'GaiaDeskEmbed', :podspec => 'https://raw.githubusercontent.com/Gaia-Desk/gaiadesk-embed-ios/v0.1.0/GaiaDeskEmbed.podspec'`
+- Android: download `embed-android-0.1.0.aar` from the
+  [gaiadesk-embed-android release](https://github.com/Gaia-Desk/gaiadesk-embed-android/releases/tag/v0.1.0)
+  and set `GaiaDeskEmbed_embedAndroidAar=/path/to/embed-android-0.1.0.aar` in
+  `android/gradle.properties` (see the overrides below).
 
 **iOS** (15.0+): the plugin's pod depends on `GaiaDeskEmbed` (`~> 0.1`), which carries the Swift
 SDK and the prebuilt `GaiaDeskEmbedFFI.xcframework`. Set `platform :ios, '15.0'` in
@@ -33,7 +60,8 @@ fetched by `scripts/fetch-binary.sh`), add `pod 'GaiaDeskEmbed', :path => '…/g
 to your Runner target (the example's Podfile does this when `GAIADESK_EMBED_IOS_PATH` is set).
 
 **Android** (minSdk 26): the plugin depends on `net.gaiadesk:embed-android:0.1.0` (the Kotlin SDK
-and `libgaiadesk_embed.so` for arm64-v8a, armeabi-v7a and x86_64) from Maven Central. Set
+and `libgaiadesk_embed.so` for arm64-v8a, armeabi-v7a and x86_64) from Maven Central (once
+published there). Set
 `minSdk = 26` in `android/app/build.gradle.kts`. Overrides, in your `android/gradle.properties`
 (or as environment variables):
 
@@ -271,6 +299,13 @@ git tag v0.1.0 && git push origin main v0.1.0
 flutter pub publish                    # a pub.dev account (Google sign-in) that is an uploader;
                                        # the first upload creates the package
 ```
+
+## Links
+
+- pub.dev: `gaiadesk_embed` is not published yet; install from this repository's `v0.1.0` tag (see Install)
+- Guide: [Embedding GaiaDesk](https://gaiadesk.net/docs/embedding-gaiadesk) on gaiadesk.net
+- Embed SDKs: [Web](https://github.com/Gaia-Desk/gaiadesk-embed) · [Electron](https://github.com/Gaia-Desk/gaiadesk-embed-electron) · [macOS (Swift)](https://github.com/Gaia-Desk/gaiadesk-embed-swift) · [C/C++ and Qt](https://github.com/Gaia-Desk/gaiadesk-embed-cpp) · [.NET](https://github.com/Gaia-Desk/gaiadesk-embed-dotnet) · [iOS](https://github.com/Gaia-Desk/gaiadesk-embed-ios) · [Android](https://github.com/Gaia-Desk/gaiadesk-embed-android) · [React Native](https://github.com/Gaia-Desk/gaiadesk-embed-react-native) · [Flutter](https://github.com/Gaia-Desk/gaiadesk-embed-flutter)
+- [Changelog](CHANGELOG.md) · [Security policy](https://github.com/Gaia-Desk/.github/blob/main/SECURITY.md)
 
 ## Licences
 
